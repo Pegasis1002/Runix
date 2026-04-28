@@ -3,6 +3,7 @@
 
 _start:
     la sp, 0x88000000
+
     call kmain
 
 halt:

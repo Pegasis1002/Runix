@@ -1,27 +1,40 @@
 # Define our toolchain and flags as variables so we can easily change them
 CC = riscv32-none-elf-gcc
 LD = riscv32-none-elf-ld
-CFLAGS = -march=rv32im -mabi=ilp32 -mcmodel=medany -ffreestanding -O0
+CFLAGS = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany -ffreestanding -O0
+
+SRC_DIR = src
+BUILD_DIR = build
+
+TARGET_ELF = $(BUILD_DIR)/runix.elf
+OBJS = $(BUILD_DIR)/boot.o $(BUILD_DIR)/main.o
+
 
 # 'all' is the default target when you just type 'make'
-all: runix.elf
+all: $(TARGET_ELF)
 
-# How to build the final ELF. It depends on boot.o and main.o
-runix.elf: boot.o main.o
-	$(LD) -T linker.ld boot.o main.o -o runix.elf
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
-# How to build boot.o. It depends on boot.s
-boot.o: boot.s
-	$(CC) $(CFLAGS) -c boot.s -o boot.o
+# How to build the final ELF. 
+# $^ means "all prerequisites" (the .o files)
+# $@ means "the target" (the .elf file)
+$(TARGET_ELF): $(OBJS) | $(BUILD_DIR)
+	$(LD) -T linker.ld $^ -o $@
 
-# How to build main.o. It depends on main.c
-main.o: main.c
-	$(CC) $(CFLAGS) -c main.c -o main.o
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.s | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Pattern rule: How to build ANY .o file from a .c file in the src dir
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 # A utility command to delete compiled files
 clean:
-	rm -f *.o *.elf *.bin
+	rm -rf $(BUILD_DIR)
 
 # Change the path to wherever your emulator is
-run: runix.elf
+run: $(TARGET_ELF)
 	../Iron-clad/target/debug/iron-clad runix.elf
+
+.PHONY: all clean run

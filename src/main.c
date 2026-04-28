@@ -5,6 +5,7 @@ typedef unsigned int uint32_t;
 void print_char(char c);
 void print_str(const char* str);
 
+// Entry point
 void kmain(void){
     for (int i = 0; i < 341; i++) {
         VRAM[i] = 0xFFFF0000;
@@ -27,4 +28,3 @@ void print_str(const char* str){
         UART = str[i];
     }
 }
-
