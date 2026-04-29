@@ -1,40 +1,57 @@
-# Define our toolchain and flags as variables so we can easily change them
+# --- Toolchain ---
 CC = riscv32-none-elf-gcc
 LD = riscv32-none-elf-ld
-CFLAGS = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany -ffreestanding -O0
 
+# Include the src directory so #include "interrupts/interrupts.h" works
+INC_FLAGS = -Isrc
+# -MMD -MP are the magic flags that tell GCC to track .h file dependencies automatically
+CFLAGS = -march=rv32im_zicsr -mabi=ilp32 -mcmodel=medany -ffreestanding -O0 $(INC_FLAGS) -MMD -MP
+
+# --- Directories ---
 SRC_DIR = src
 BUILD_DIR = build
 
+# --- Auto-Discovery ---
+# Find all .c and .s files inside src/ and its subdirectories
+C_SRCS := $(shell find $(SRC_DIR) -name '*.c')
+ASM_SRCS := $(shell find $(SRC_DIR) -name '*.s')
+
+# Replace "src/..." with "build/..." and ".c/.s" with ".o"
+C_OBJS := $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(C_SRCS))
+ASM_OBJS := $(patsubst $(SRC_DIR)/%.s, $(BUILD_DIR)/%.o, $(ASM_SRCS))
+
+# Combine them into one list of objects
+OBJS := $(C_OBJS) $(ASM_OBJS)
+
+# Generate a list of dependency files (.d) created by GCC
+DEPS := $(OBJS:.o=.d)
+
 TARGET_ELF = $(BUILD_DIR)/runix.elf
-OBJS = $(BUILD_DIR)/boot.o $(BUILD_DIR)/main.o
 
-
-# 'all' is the default target when you just type 'make'
+# --- Rules ---
 all: $(TARGET_ELF)
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
-# How to build the final ELF. 
-# $^ means "all prerequisites" (the .o files)
-# $@ means "the target" (the .elf file)
-$(TARGET_ELF): $(OBJS) | $(BUILD_DIR)
+$(TARGET_ELF): $(OBJS)
+	@mkdir -p $(dir $@)
 	$(LD) -T linker.ld $^ -o $@
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.s | $(BUILD_DIR)
+# How to compile C files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Pattern rule: How to build ANY .o file from a .c file in the src dir
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+# How to compile Assembly files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.s
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# A utility command to delete compiled files
 clean:
 	rm -rf $(BUILD_DIR)
 
-# Change the path to wherever your emulator is
 run: $(TARGET_ELF)
-	../Iron-clad/target/debug/iron-clad runix.elf
+	../Iron-clad/target/debug/iron-clad $(TARGET_ELF)
 
 .PHONY: all clean run
+
+# Include the auto-generated dependency files
+-include $(DEPS)

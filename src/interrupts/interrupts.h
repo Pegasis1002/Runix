@@ -1,3 +1,2 @@
 
-void handle_trap(void) {
-}
+void handle_trap(void);
